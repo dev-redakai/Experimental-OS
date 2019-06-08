@@ -1,0 +1,125 @@
+alias physicalSP S0;
+physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+
+alias sysCallno S1;
+sysCallno = [physicalSP - 1];
+
+//find current pcb;
+alias currentPID S2;
+currentPID = (PTBR-1024) / 8;
+
+alias currentPCB S3;
+currentPCB = READY_LIST + 32 * currentPID;
+
+alias counter S4;
+
+//print("1step");
+
+if(sysCallno == 10) then //also do process scheduling for next
+ 
+//print("inside 8");
+
+alias newPID S15;
+
+counter = 0;
+while(counter < 32) do
+     if([READY_LIST + counter * 32 + 1] == 1) then
+        break;
+     endif;
+     counter = counter + 1;
+endwhile;
+
+if(counter == 32) then
+          print("no process"); //if no other process dont need to do anything
+          halt;
+          [physicalSP - 2] = 0;
+          ireturn;
+        endif;
+
+[currentPCB + 1] = 0; //terminated
+
+
+newPID = counter;
+
+counter = 0;
+
+alias currentPage S11;
+
+while(counter < 4) do
+
+
+       currentPage = [PTBR + counter * 2];
+
+       if (currentPage != -1) then //there is a page available for the currentprocess
+          
+                 [MEM_LIST + currentPage] = 0;
+
+                 [PTBR + counter * 2] = -1;
+                 [PTBR + counter * 2 + 1] = "00";
+       endif;
+       
+       
+
+     counter = counter + 1;
+endwhile;
+
+counter = 0;
+
+
+alias SWOIndex S14;
+
+while(counter < 4 ) do
+
+          
+     if([currentPCB + 15 + counter*2]  != -1) then
+        SWOIndex = [currentPCB + 15 + counter*2];
+        [FILE_TABLE + (SWOIndex*2) + 1] = [FILE_TABLE + (SWOIndex*2) + 1] - 1;
+
+        if([FILE_TABLE + (SWOIndex*2) + 1] == 0) then
+          [FILE_TABLE + (SWOIndex*2) + 0] = -1;
+        endif;
+
+     endif;
+    
+     [currentPCB + 15 + counter*2] = -1;
+     [currentPCB + 15 + counter*2 + 1] = -1;
+
+    
+     counter = counter + 1;
+endwhile;
+
+
+alias newPCB S13;
+newPCB = READY_LIST + 32 * newPID;
+
+
+BP  = [newPCB + 2];
+SP = [newPCB + 3];
+//IP = [newPCB + 4];
+PTBR = [newPCB + 5];
+PTLR = [newPCB + 6];
+R0 = [newPCB + 7];
+R1 = [newPCB + 8];
+R2 = [newPCB + 9];
+R3 = [newPCB + 10];
+R4 = [newPCB + 11];
+R5 = [newPCB + 12];
+R6 = [newPCB + 13];
+R7 = [newPCB + 14];
+
+[newPCB + 1] = 2;
+[newPCB + 0] = newPID;
+
+
+SP=SP+1;
+//physicalSP = [PTBR + 6]*512; alternate way to find physicalsp
+
+physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+[physicalSP-0] = [newPCB+4]; //calculate SP again have to set ip and sp because exec may be called in middle of some prog,so have tostart begin
+
+print("exit done");
+//[physicalSP - 2] = 0;
+
+ireturn;
+endif;
+ireturn;

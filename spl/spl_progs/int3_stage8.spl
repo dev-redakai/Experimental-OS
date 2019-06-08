@@ -1,0 +1,123 @@
+alias physicalSP S0;
+physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+
+alias sysCallno S1;
+sysCallno = [physicalSP - 1];
+
+//find current pcb;
+alias currentPID S5;
+currentPID = (PTBR-1024) / 8;
+
+alias currentPCB S6;
+currentPCB = READY_LIST + 32 * currentPID;
+
+alias SWOIndex S7;
+
+if(sysCallno == 7) then
+ 
+   alias fd S2;
+   fd = [physicalSP - 4];
+//   print(fd);
+   
+
+   if(fd > 7 || fd < 0) then
+      print("invalid fd");
+      [physicalSP - 2] = -1;
+      ireturn;
+   endif;
+
+   if([currentPCB + 15 + (fd*2) + 0] == -1) then
+      print("not opened by this process");
+      [physicalSP - 2] = -1;
+      ireturn;
+  endif;
+                                               // no need to check for fat because after present in process only updating fat whle opening
+   SWOIndex = [currentPCB + 15 + (fd*2) + 0];
+   
+   alias LSEEK S4;
+   LSEEK = [currentPCB + 15 + (fd*2) + 1]; 
+   
+   alias FATIndexCounter S8;
+   FATIndexCounter = [FILE_TABLE + (SWOIndex*2) + 0];
+    
+   alias basicBlock S9;
+   basicBlock = [FAT + FATIndexCounter * 8 + 2];
+
+load(1,basicBlock);
+
+alias dataBlock S10;
+alias k  S11;
+alias basicBlockEntry S12;
+
+basicBlockEntry = [SCRATCHPAD + (LSEEK/512)];
+
+alias fileSize S9;
+   fileSize = [FAT + FATIndexCounter * 8 + 1];
+
+      if(LSEEK >= fileSize) then
+      print("no space");
+      [physicalSP - 2] = -1;
+      ireturn;
+   endif;
+
+
+dataBlock = basicBlockEntry;
+load(1,dataBlock);
+alias data S13;
+data = [SCRATCHPAD + (LSEEK % 512) ];
+print(data);
+
+[physicalSP - 3] = data;
+[currentPCB + 15 + (fd*2) + 1] = [currentPCB + 15 + (fd*2) + 1] + 1;
+
+print("read done");
+[physicalSP - 2] = 0;
+ireturn;
+endif;
+
+if(sysCallno == 6) then
+
+   alias fd S2;
+   fd = [physicalSP - 4];
+//   print(fd);
+
+
+   alias l S3;
+   l = [physicalSP - 3];
+  // print(w);
+
+   if(fd > 7 || fd < 0) then
+      print("invalid fd");
+      [physicalSP - 2] = -1;
+      ireturn;
+   endif;
+
+   if([currentPCB + 15 + (fd*2) + 0] == -1) then
+      print("not opened by this process");
+      [physicalSP - 2] = -1;
+      ireturn;
+  endif;
+
+  SWOIndex = [currentPCB + 15 + (fd*2) + 0];
+
+   alias FATIndexCounter S8;
+   FATIndexCounter = [FILE_TABLE + (SWOIndex*2) + 0];
+
+   alias fileSize S9;
+   fileSize = [FAT + FATIndexCounter * 8 + 1];
+
+      if(l <  0 || l >= fileSize) then
+      print("invalid lseek");
+      [physicalSP - 2] = -1;
+      ireturn;
+   endif;
+[currentPCB + 15 + (fd*2) + 1] = l;
+print("new seek");
+alias random S9;
+random = [currentPCB + 15 + (fd*2) + 1];
+print(random);
+[physicalSP - 2] = 0;
+ireturn;
+endif;
+
+ireturn;

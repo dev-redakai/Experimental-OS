@@ -1,0 +1,150 @@
+alias physicalSP S0;
+physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+
+alias sysCallno S1;
+sysCallno = [physicalSP - 1];
+
+//find current pcb;
+alias currentPID S2;
+currentPID = (PTBR-1024) / 8;
+
+alias currentPCB S3;
+currentPCB = READY_LIST + 32 * currentPID;
+
+alias counter S4;
+
+//print("1step");
+
+if(sysCallno == 9) then
+ 
+//print("inside 8");
+
+
+alias newProgram S15;
+
+newProgram = [physicalSP - 3];
+
+
+counter = 0;
+while(counter < 64) do
+     if([FAT + counter * 8 + 0] == newProgram) then
+        break;
+     endif;
+     counter = counter + 1;
+endwhile;
+
+if(counter == 64) then
+          print("no suchfile");
+          [physicalSP - 2] = -1;
+          ireturn;
+        endif;
+
+alias newProgramFAT S5;
+
+newProgramFAT = counter;
+
+counter = 0;
+
+alias counter1 S7;
+
+alias newBB S8;
+
+newBB = [FAT + newProgramFAT * 8 + 2]; 
+
+load(1,newBB);
+
+alias dataBlock S9;
+
+alias newPage S10;
+
+alias currentPage S11;
+
+while(counter < 3) do
+     
+     dataBlock = [SCRATCHPAD + counter];
+
+     if(dataBlock != -1 && dataBlock != "") then //some data blocks are there in the new file
+
+       currentPage = [PTBR + counter * 2];
+
+       if (currentPage != -1) then //there is a page available for the currentprocess
+          
+           load(currentPage,dataBlock);
+       
+       else  //for current process no page allocated so have to search for a new
+     
+           counter1 = 29;
+           while(counter1 < 64) do
+              if([MEM_LIST + counter1] == 0) then
+                 [MEM_LIST + counter1] = 1;
+                 newPage = counter1; //only page no. required
+                 
+     		 load(newPage,dataBlock);
+      
+                 [PTBR + counter * 2] = newPage;
+                 [PTBR + counter * 2 + 1] = "01";
+                 break;
+               endif;
+
+              counter1 = counter1 + 1;
+           endwhile;
+        
+        if(counter1 == 64) then
+          print("no memory");
+          [physicalSP - 2] = -1;
+          ireturn;
+        endif;
+   
+      endif; 
+      
+     else   //if data block of new program is -1 i.e not needed
+       
+        if (currentPage != -1)  then //but there is page allocated in current process
+           [MEM_LIST + currentPage] = 0;
+           [PTBR + counter * 2] = -1;
+           [PTBR + counter * 2 + 1] = "00";
+        endif;
+        //for both -1 dont do anything
+
+     endif;
+
+     counter = counter + 1;
+endwhile;
+
+counter = 0;
+
+
+alias SWOIndex S14;
+
+while(counter < 4 ) do
+
+          
+     if([currentPCB + 15 + counter*2]  != -1) then
+        SWOIndex = [currentPCB + 15 + counter*2];
+        [FILE_TABLE + (SWOIndex*2) + 1] = [FILE_TABLE + (SWOIndex*2) + 1] - 1;
+
+        if([FILE_TABLE + (SWOIndex*2) + 1] == 0) then
+          [FILE_TABLE + (SWOIndex*2) + 0] = -1;
+        endif;
+
+     endif;
+
+     [currentPCB + 15 + counter*2] = -1;
+     [currentPCB + 15 + counter*2 + 1] = -1;
+
+    
+     counter = counter + 1;
+endwhile;
+
+SP=3*512;
+//physicalSP = [PTBR + 6]*512; alternate way to find physicalsp
+
+physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+[physicalSP-0] = 0; //calculate SP again have to set ip and sp because exec may be called in middle of some prog,so have to start from brigin
+
+print("exec done");
+//[physicalSP - 2] = 0;
+
+ireturn;
+endif;
+ireturn;

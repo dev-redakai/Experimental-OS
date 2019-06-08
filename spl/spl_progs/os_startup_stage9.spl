@@ -1,0 +1,109 @@
+load (7,1);//exception
+load (8,2);
+
+load (23,17);//int 7
+load (24,18);
+
+//for init
+
+[READY_LIST + 0] = 0; //pid as 0
+
+load(25,21); //pages for init for code
+load(26,22); 
+load(27,23); 
+
+PTBR = 1024; //1024 + PID * 8 
+PTLR = 4;   //fixed
+
+[PTBR + 0] = 25;    //pages
+[PTBR + 1] = "01";  //valid or not
+[PTBR + 2] = 26; 
+[PTBR + 3] = "01";
+[PTBR + 4] = 27; 
+[PTBR + 5] = "01";
+[PTBR + 6] = 28; 
+[PTBR + 7] = "01";
+
+[READY_LIST + 1] = 2;  //running
+
+//setting per prcess open file table for init
+
+[READY_LIST +  15] = -1;
+[READY_LIST + 16] = -1;
+[READY_LIST + 17] = -1;
+[READY_LIST + 18] = -1;
+[READY_LIST + 19] = -1;
+[READY_LIST + 20] = -1;
+[READY_LIST + 21] = -1;
+[READY_LIST + 22] = -1;
+[READY_LIST + 23] = -1;
+[READY_LIST + 24] = -1;
+[READY_LIST + 25] = -1;
+[READY_LIST + 26] = -1;
+[READY_LIST + 27] = -1;
+[READY_LIST + 28] = -1;
+[READY_LIST + 29] = -1;
+[READY_LIST + 30] = -1;
+
+SP = 3 * 512; 
+
+[28 * 512] = 0; //ip
+load (11, 5);  //int 1
+load (12, 6);
+load (9,3); // timer
+load (10,4);
+
+load(5,19);
+load(6,20);
+
+load(13,7);//int load
+load(14,8);
+load(15,9);
+load(16,10);
+load(17,11);
+load(18,12);
+
+
+
+//making system wide open file table entries -1 //initialize
+
+alias counter S0;
+counter = 0;
+
+counter = 0;
+while(counter < 128) do
+     [FILE_TABLE + counter + 0] = -1;
+     [FILE_TABLE + counter + 1] = 0;
+     counter = counter + 2;
+endwhile;
+
+load(19,13);//int load
+load(20,14);
+load(21,15);//int load
+load(22,16);
+
+counter = 0;
+while(counter < 25) do
+     [MEM_LIST + counter ] = 1;
+     counter = counter + 1;
+endwhile;
+
+[MEM_LIST + 25] = 1;
+[MEM_LIST + 26] = 1;
+[MEM_LIST + 27] = 1;
+[MEM_LIST + 28] = 1;
+
+counter = 29;
+while(counter < 64) do
+     [MEM_LIST + counter ] = 0;
+     counter = counter + 1;
+endwhile;
+     
+counter = 1;
+while(counter < 32) do
+     [READY_LIST + counter * 32 + 1] = 0;
+     [READY_LIST + counter * 32 + 1] = 0;
+     counter = counter + 1;
+endwhile;
+
+ireturn;

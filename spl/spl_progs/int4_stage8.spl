@@ -1,0 +1,110 @@
+alias physicalSP S0;
+physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+
+alias sysCallno S1;
+sysCallno = [physicalSP - 1];
+
+//find current pcb;
+alias currentPID S5;
+currentPID = (PTBR-1024) / 8;
+
+alias currentPCB S6;
+currentPCB = READY_LIST + 32 * currentPID;
+
+alias SWOIndex S7;
+
+if(sysCallno == 5) then
+ 
+   alias fd S2;
+   fd = [physicalSP - 4];
+//   print(fd);
+   
+   
+   alias w S3;
+   w = [physicalSP - 3];
+  // print(w);
+
+   if(fd > 7 || fd < 0) then
+      print("invalid fd");
+      [physicalSP - 2] = -1;
+      ireturn;
+   endif;
+
+   if([currentPCB + 15 + (fd*2) + 0] == -1) then
+      print("not opened by this process");
+      [physicalSP - 2] = -1;
+      ireturn;
+  endif;
+                                               // no need to check for fat because after present in process only updating fat whle opening
+   SWOIndex = [currentPCB + 15 + (fd*2) + 0];
+   
+   alias LSEEK S4;
+   LSEEK = [currentPCB + 15 + (fd*2) + 1]; 
+   
+   alias FATIndexCounter S8;
+   FATIndexCounter = [FILE_TABLE + (SWOIndex*2) + 0];
+    
+   alias basicBlock S9;
+   basicBlock = [FAT + FATIndexCounter * 8 + 2];
+
+load(1,basicBlock);
+
+alias dataBlock S10;
+alias k  S11;
+alias basicBlockEntry S12;
+
+         basicBlockEntry = [SCRATCHPAD + (LSEEK/512)];
+         if(basicBlockEntry == -1 || basicBlockEntry == "") then
+            
+            alias DFLIndexCounter S13;
+            DFLIndexCounter = 24;
+
+            while (DFLIndexCounter < 448) do
+              if([DISK_LIST + DFLIndexCounter] == 0) then
+                break;
+              endif;
+            DFLIndexCounter = DFLIndexCounter + 1;
+            endwhile;
+
+         if(DFLIndexCounter == 448) then
+          print("no dfl");
+          [physicalSP - 2] = -1;
+          ireturn;
+         endif;
+ 
+         load(1,DFLIndexCounter);
+         
+         k = 0;
+         while (k < 511) do
+               [SCRATCHPAD + k]= "";
+               k = k + 1;
+         endwhile;
+
+         store(1,DFLIndexCounter);
+
+         [DISK_LIST + DFLIndexCounter] = 1;
+         [FAT + FATIndexCounter * 8 + 1] = [FAT + FATIndexCounter * 8 + 1] + 512;
+
+         load(1,basicBlock);
+         [SCRATCHPAD + (LSEEK/512)]= DFLIndexCounter;
+         store(1,basicBlock);
+         dataBlock = DFLIndexCounter;
+       
+       else
+         
+          dataBlock = basicBlockEntry;
+
+       endif;
+
+load(1,dataBlock);
+[SCRATCHPAD + (LSEEK % 512) ] = w;
+[currentPCB + 15 + (fd*2) + 1] = [currentPCB + 15 + (fd*2) + 1] + 1;
+store(1,dataBlock);
+
+store(6,20);
+store(5,19);
+print("written");
+[physicalSP - 2] = 0;
+ireturn;
+endif;
+ireturn;

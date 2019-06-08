@@ -1,0 +1,174 @@
+alias physicalSP S0;
+physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+
+alias sysCallno S1;
+sysCallno = [physicalSP - 1];
+
+alias fileName S2;
+   fileName = [physicalSP - 3];
+
+alias FATIndexCounter S3;
+FATIndexCounter = 0;
+
+alias counter  S9;
+
+alias basicBlock  S7;
+
+while (FATIndexCounter < 64) do
+         if(fileName == [(FAT + FATIndexCounter * 8) + 0]) then
+                break;
+         endif;
+         FATIndexCounter = FATIndexCounter + 1;
+   endwhile;
+
+if ( sysCallno == 1) then
+
+   if(FATIndexCounter != 64) then
+      print("File Exist");
+      [physicalSP - 2] = 0;
+      ireturn;
+   endif;
+
+   alias DFLIndexCounter S5;
+   DFLIndexCounter = 24;
+
+   alias freeDiskIndex S6;
+
+   while (DFLIndexCounter < 448) do  
+         if([DISK_LIST + DFLIndexCounter] == 0) then
+                freeDiskIndex = DFLIndexCounter;
+                break;
+         endif;
+         DFLIndexCounter = DFLIndexCounter + 1;
+   endwhile;
+   if(DFLIndexCounter == 448) then
+     //	print(1);
+	[physicalSP - 2] = -1;
+        ireturn;
+   endif;
+
+  alias basicBlock  S7;
+  basicBlock = freeDiskIndex;
+  
+  alias freeFATIndex  S8;
+  FATIndexCounter = 0;
+  while (FATIndexCounter < 64 && [FAT + FATIndexCounter*8] != -1) do
+         FATIndexCounter = FATIndexCounter + 1;
+   endwhile;
+
+  if(FATIndexCounter == 64) then
+//	print(2);
+        [physicalSP - 2] = -1;
+        ireturn;
+   endif;
+
+ [ FAT + FATIndexCounter*8] = fileName;
+ [ FAT + FATIndexCounter*8 + 1] = 0;
+ [  FAT + FATIndexCounter*8 + 2 ] = basicBlock;
+
+ load(1,basicBlock);
+
+ alias counter  S9;
+ counter  = 0;
+ while (counter < 256) do
+         [SCRATCHPAD + counter]  = "";
+         counter = counter + 1;
+   endwhile;
+
+ store(1,basicBlock);
+
+ [DISK_LIST + basicBlock] = 1;
+
+ store(5,19);
+ store(6,20);
+
+ print("File Created");
+ [physicalSP - 2] = 0;
+ 
+ ireturn;
+
+endif;
+
+if ( sysCallno == 4) then
+
+if(FATIndexCounter == 64) then
+      print("File Not Exists");
+      [physicalSP - 2] = -1;
+      ireturn;
+   endif;	
+
+counter = 0;
+
+while (counter < 128) do
+         if([FILE_TABLE + counter + 0] == FATIndexCounter) then
+            print("Opened By Process");
+            [physicalSP - 2] = -1;
+            ireturn;
+         endif;
+         counter = counter + 2;
+endwhile;
+
+
+basicBlock = [FAT + FATIndexCounter * 8 + 2];
+
+load(1,basicBlock);
+
+alias dataBlock S4;
+alias k  S5;
+counter = 0;
+while (counter < 512) do
+         dataBlock = [SCRATCHPAD + counter];
+    //     print("datblock");
+    //     print(dataBlock);
+         if(dataBlock == -1 || dataBlock == "") then
+  //           print("Inside if");
+            break;
+         endif;
+
+         load(1,dataBlock);
+
+         k  = 0;
+         while (k < 511) do
+               [SCRATCHPAD + k]= "";
+               k = k + 1;
+         endwhile;
+        
+         [DISK_LIST + dataBlock] = 0;
+
+         store(1,dataBlock);
+
+         load(1,basicBlock);         
+
+         counter = counter + 1;
+endwhile;
+
+k  = 0;
+while (k < 511) do
+      [SCRATCHPAD + k]  = "";
+      k = k + 1;
+endwhile;
+
+store(1,basicBlock);
+
+[DISK_LIST + basicBlock] = 0;
+
+[FAT + FATIndexCounter * 8 + 2] = -1;
+[FAT + FATIndexCounter * 8 + 0] = -1;
+[FAT + FATIndexCounter * 8 + 1] = 0;
+
+store(5,19);
+store(6,20);
+
+print("File Deleted");
+[physicalSP - 2] = 0;
+ireturn;
+
+
+endif;
+ireturn;
+
+
+
+
+
+

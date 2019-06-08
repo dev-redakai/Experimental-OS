@@ -1,0 +1,131 @@
+alias physicalSP S0;
+physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+
+alias sysCallno S1;
+sysCallno = [physicalSP - 1];
+
+//find current pcb;
+alias currentPID S6;
+currentPID = (PTBR-1024) / 8;
+
+alias currentPCB S7;
+currentPCB = READY_LIST + 32 * currentPID;
+
+alias SWOIndex S5;
+
+if ( sysCallno == 2) then
+
+ alias fileName S2;
+   fileName = [physicalSP - 3];
+
+   alias FATIndexCounter S3;
+   FATIndexCounter = 0;
+
+
+   while (FATIndexCounter < 64) do
+         if(fileName == [(FAT + FATIndexCounter * 8) + 0]) then
+            break;
+         endif;
+         FATIndexCounter = FATIndexCounter + 1;
+   endwhile;
+
+   if(FATIndexCounter == 64) then
+        print("File Not Exist");
+        [physicalSP - 2] = -1;
+        ireturn;
+   endif;
+
+  //otherwise FATIndexCounter will contain the fat index of the file
+
+   alias counter S4;
+   counter = 0;
+
+   while (counter < 128) do
+         if([FILE_TABLE + counter + 0] == FATIndexCounter) then
+                SWOIndex = counter/2; //will get swo index
+                break;
+
+         endif;
+         counter = counter + 2;
+   endwhile;
+
+ if(counter == 128) then  //if entry not present in swo
+ counter = 0;
+ while (counter < 128) do
+         if([FILE_TABLE + counter + 0] == -1) then
+                SWOIndex = counter/2;
+                break;
+
+         endif;
+         counter = counter + 2;
+   endwhile;
+endif;
+
+ if(counter == 128) then //if swo full
+        print("SWO full");
+        [physicalSP - 2] = -1;
+        ireturn;
+   endif;
+
+  counter = 0;
+
+  while (counter < 16) do
+         if(([currentPCB+15+counter+0]) == -1) then
+                break;
+         endif;
+         counter = counter + 2;
+   endwhile;
+
+  if(counter == 16) then
+	print("process pt full");
+        [physicalSP - 2] = -1;
+        ireturn;
+   endif;
+
+//per process open file index update
+ [currentPCB+15+counter+0] = SWOIndex;
+ [currentPCB+15+counter+1] = 0;
+
+ [FILE_TABLE + (SWOIndex * 2) + 0 ] = FATIndexCounter; //again writing if also present but no problem
+ [FILE_TABLE + (SWOIndex * 2) + 1 ] = [FILE_TABLE + SWOIndex * 2 + 1 ] + 1;
+
+ print("File Opened");
+ [physicalSP - 2] = (counter/2);//index of per process file open table returned;
+ ireturn;
+
+endif;
+
+if(sysCallno == 3) then
+ 
+   alias fd S2;
+   fd = [physicalSP - 3];
+
+   if(fd > 7 && fd < 0) then
+      print("invalid fd");
+      [physicalSP - 2] = -1;
+      ireturn;
+   endif;
+
+   if([currentPCB + 15 + (fd*2) + 0] == -1) then
+      print("not opened by this process");
+      [physicalSP - 2] = -1;
+      ireturn;
+  endif;
+                                               // no need to check for fat because after present in process only updating fat whle opening
+   SWOIndex = [currentPCB + 15 + (fd*2) + 0];
+   
+   [FILE_TABLE + (SWOIndex*2) + 1] = [FILE_TABLE + (SWOIndex*2) + 1] - 1;
+
+   if ([FILE_TABLE + (SWOIndex*2) + 1] == 0) then
+      [FILE_TABLE + (SWOIndex*2) + 0] = -1;
+   endif;
+
+   [currentPCB + 15 + (fd*2) + 0 ] = -1;
+   [currentPCB + 15 + (fd*2) + 1 ] = -1;
+
+  print("File Closed");
+  [physicalSP - 2] = 0;
+      ireturn;
+endif;
+
+ireturn;

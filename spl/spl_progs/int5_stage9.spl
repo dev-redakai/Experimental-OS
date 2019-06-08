@@ -1,0 +1,153 @@
+alias physicalSP S0;
+physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+
+alias sysCallno S1;
+sysCallno = [physicalSP - 1];
+
+//find current pcb;
+alias parentPID S2;
+parentPID = (PTBR-1024) / 8;
+
+alias parentPCB S3;
+parentPCB = READY_LIST + 32 * parentPID;
+
+alias counter S4;
+
+//print("1step");
+
+if(sysCallno == 8) then
+ 
+//print("inside 8");
+
+
+counter = 0;
+while(counter < 32) do
+     if([READY_LIST + counter * 32 + 1] == 0) then
+        break;
+     endif;
+     counter = counter + 1;
+endwhile;
+
+if(counter == 32) then
+          print("no readylist");
+          [physicalSP - 2] = -1;
+          ireturn;
+        endif;
+
+alias childPID S5;
+
+childPID = counter;
+
+alias childPCB S6;
+
+childPCB = READY_LIST + 32 * childPID;
+
+[childPCB + 0 ] = childPID;
+
+counter = 0;
+
+alias counter1 S7;
+
+alias childPTBR S8;
+
+childPTBR = 1024 + childPID * 8; 
+
+alias childPage S9;
+
+alias k S10;
+
+alias parentPage S11;
+
+while(counter < 4) do
+     
+     parentPage = [PTBR + counter * 2];
+
+     if (parentPage != -1) then
+        counter1 = 29;
+        while(counter1 < 64) do
+              if([MEM_LIST + counter1] == 0) then
+                 [MEM_LIST + counter1] = 1;
+                 childPage = counter1; //only page no. required
+              
+
+         	k = 0;
+         	while (k < 512) do
+               	      [childPage * 512 + k] = [parentPage * 512 + k];	
+                      k = k + 1;
+               endwhile;
+      
+                 [childPTBR + counter * 2] = childPage;
+                 [childPTBR + counter * 2 + 1] = "01";
+                 break;
+               endif;
+
+               counter1 = counter1 + 1;
+        endwhile;
+        
+        if(counter1 == 64) then
+          print("no memory");
+          [physicalSP - 2] = -1;
+          ireturn;
+        endif; 
+      
+     else
+        
+        [childPTBR + counter * 2] = -1;
+        [childPTBR + counter * 2 + 1] = "00";
+
+     endif;
+
+     counter = counter + 1;
+endwhile;
+
+[childPCB + 5] = childPTBR;
+[childPCB + 6] = 4;
+
+[childPCB + 4] = [physicalSP];
+
+[childPCB + 3] = SP - 1;
+[childPCB + 2] = BP;
+[childPCB + 7] = R0;
+[childPCB + 8] = R1;
+[childPCB + 9] = R2;
+[childPCB + 10] = R3;
+[childPCB + 11] = R4;
+[childPCB + 12] = R5;
+[childPCB + 13] = R6;
+[childPCB + 14] = R7;
+
+
+counter = 0;
+
+alias parentFile S12;
+
+alias childFile S13;
+
+alias SWOIndex S14;
+
+while(counter < 4 ) do
+
+     [childPCB + 15 + counter*2] = [parentPCB + 15 + counter*2];
+     [childPCB + 15 + counter*2 + 1] = [parentPCB + 15 + counter*2 + 1];
+     
+     if([parentPCB + 15 + counter*2]  != -1) then
+        SWOIndex = [parentPCB + 15 + counter*2];
+        [FILE_TABLE + (SWOIndex*2) + 1] = [FILE_TABLE + (SWOIndex*2) + 1] + 1;
+     endif;
+    
+     counter = counter + 1;
+endwhile;
+
+[childPCB + 1] = 1;
+
+print("child p created");
+[physicalSP - 2] = childPID;
+
+alias childphysicalSP S15;
+childphysicalSP = ([childPTBR + 2 * ((SP-1) / 512)] * 512) + ((SP-1) % 512);
+
+[childphysicalSP - 1] = -2;
+
+ireturn;
+endif;
+ireturn;
